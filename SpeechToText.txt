@@ -1,0 +1,108 @@
+1. First run this command:
+
+   npx @react-native-community/cli init myapp  --version 0.71.6  → instead of “myapp” you can  give your app name.
+
+
+2. Than go to your app directory and run those command:
+
+       cd myapp
+       npm run-android  # Run on Android emulator/device
+       npx react-native run-ios  # Run on iOS (Mac only)
+
+3. Install Required Packages:
+
+      npm install @react-native-voice/voice  → capture voice and convert it into text
+      npm install react-native-vector-icons → For the microphone icon
+
+4. Setup Permissions for Android: android→app→src→main→ `AndroidManifest.xml`
+
+      In `AndroidManifest.xml`, add:
+
+     <uses-permission android:name="android.permission.RECORD_AUDIO"/>
+
+    <queries>
+      <intent>
+        <action android:name="android.speech.RecognitionService" /> 
+      </intent>
+     </queries>
+
+
+5. Setup Permissions for iOS:
+
+      Go to your iOS project → `Info.plist` file and add the following permissions:
+
+      <key>NSMicrophoneUsageDescription</key>
+      <string>This app needs access to the microphone for voice recognition.</string>
+
+     <key>NSSpeechRecognitionUsageDescription</key>
+     <string>This app needs access to speech recognition for converting your voice to text.</string>
+
+6. If you're using a Mac, make sure to run this after installing native dependencies
+
+       Install pods for iOS setup:
+
+       npx pod-install ios
+
+7. we need add below code in android → app → build.gradle files inside so that our icons work properly:
+
+   apply from: "../../node_modules/react-native-vector-icons/fonts.gradle"
+
+
+
+8.  Rebuild the JavaScript Bundle for Updated Apk file:
+    
+    npx react-native bundle --platform android --dev false --entry-file index.js --bundle-output android/app/src/main/assets/index.android.bundle --assets-dest android/app/src/main/res/
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
