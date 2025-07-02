@@ -18,6 +18,8 @@ const App = () => {
   const [ttsText, setTtsText] = useState('');
 
   useEffect(() => {
+    // console.log('Tts:', Tts);
+
     Voice.onSpeechStart = () => console.log('Recording started');
     Voice.onSpeechEnd = () => setIsListening(false);
     Voice.onSpeechResults = event => setSearchText(event.value[0]);

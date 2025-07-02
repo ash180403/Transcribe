@@ -167,7 +167,7 @@ dependencies {
     }
 }
 project.ext.react = [
-  enableHermes: false,  // Turn this off to test compatibility
+  enableHermes: false,  
 ]
 
 
