@@ -1,67 +1,61 @@
-import React, {useEffect, useState} from 'react';
-import {Platform} from 'react-native';
-import {View, TextInput, TouchableOpacity, StyleSheet, PermissionsAndroid} from 'react-native';
+import React, { useEffect, useState } from 'react';
+import {
+  View,
+  TextInput,
+  TouchableOpacity,
+  StyleSheet,
+  PermissionsAndroid,
+  Text,
+  Platform,
+} from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import Voice from '@react-native-voice/voice';
+import Tts from 'react-native-tts';
 
 const App = () => {
   const [isListening, setIsListening] = useState(false);
   const [searchText, setSearchText] = useState('');
+  const [ttsText, setTtsText] = useState('');
 
-  useEffect (() => {
-    Voice.onSpeechStart = onSpeechStart;
-    Voice.onSpeechEnd = onSpeechEnd;
-    Voice.onSpeechResults = onSpeechResults;
-    Voice.onSpeechError = (error) => console.log ('onSpeech Error', error);
+  useEffect(() => {
+    Voice.onSpeechStart = () => console.log('Recording started');
+    Voice.onSpeechEnd = () => setIsListening(false);
+    Voice.onSpeechResults = event => setSearchText(event.value[0]);
+    Voice.onSpeechError = error => console.log('onSpeechError', error);
 
     const androidPermissionChecking = async () => {
-      if(Platform.OS === 'android') {
+      if (Platform.OS === 'android') {
         const granted = await PermissionsAndroid.request(
           PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
           {
             title: 'Microphone Permission',
-            message: 'This app needs access to your microphone to recognize speech',
+            message: 'This app needs access to your microphone',
             buttonNeutral: 'Ask Me Later',
-            buttonNegative:'Cancel',
+            buttonNegative: 'Cancel',
             buttonPositive: 'OK',
           }
         );
 
-        if (granted === PermissionsAndroid.RESULTS.GRANTED){
+        if (granted === PermissionsAndroid.RESULTS.GRANTED) {
           console.log('Microphone permission granted');
         } else {
           console.log('Microphone permission denied');
         }
 
         const getService = await Voice.getSpeechRecognitionServices();
-        console.log('getService for audio', getService);
+        console.log('Speech Services:', getService);
       }
     };
 
-    androidPermissionChecking(); 
+    androidPermissionChecking();
 
     return () => {
-      Voice.destroy().then (Voice.removeAllListeners);
-    }
+      Voice.destroy().then(Voice.removeAllListeners);
+    };
   }, []);
 
-  const onSpeechStart = () => {
-    console.log('Recording started');
-  }
-
-  const onSpeechEnd = () => {
-    setIsListening(false);
-    console.log('Recording ended');
-  }
-
-  const onSpeechResults = (event) => {
-    console.log ('OnSpeechResults', event);
-    const text = event.value[0];
-    setSearchText(text)
-  };
-
   const startListening = async () => {
-    try{
+    try {
       await Voice.start('en-US');
       setIsListening(true);
     } catch (error) {
@@ -70,76 +64,115 @@ const App = () => {
   };
 
   const stopListening = async () => {
-    try{ 
+    try {
       await Voice.stop();
       setIsListening(false);
     } catch (error) {
-      console.log('Stop Listening Error', error); 
+      console.log('Stop Listening Error', error);
     }
-  }
+  };
 
-  const styles = StyleSheet.create ({
-    container:{
-      flexDirection:'row',
-      backgroundColor:'#f1f1f1',
-      borderRadius:30,
-      alignItems:'center',
-      paddingHorizontal:15,
-      margin:20,
-      elevation:3,
-    },
-    input:{
-      flex:1,
-      height:45,
-      fontSize:16,
-      color:'#000',
-    },
-    iconContainer: {
-      marginLeft:10,
-    },
-    dotsContainer:{
-      flexDirection:'row',
-      justifyContent:'center',
-      alignItems:'center',
-    },
-    dot:{
-      width:6,
-      height:6,
-      borderRadius:3,
-      backgroundColor:'#333',
-      marginHorizontal:2,
-    }
-  })
+  const speakText = () => {
+    Tts.speak(ttsText);
+  };
 
   return (
-    <View style={styles.container}>
-      <TextInput
-       placeholder='Search here...'
-       value={searchText}
-       onChangeText={setSearchText}
-       style={styles.input}
-       placeholderTextColor='#999'
-      />
+    <View style={styles.page}>
+      {/* Top: Speech to Text */}
+      <View style={styles.half}>
+        <Text style={styles.sectionTitle}>🎙 Speech to Text</Text>
+        <View style={styles.container}>
+          <TextInput
+            placeholder='Say something...'
+            value={searchText}
+            onChangeText={setSearchText}
+            style={styles.input}
+            placeholderTextColor='#999'
+          />
+          <TouchableOpacity
+            onPress={() => (isListening ? stopListening() : startListening())}
+            style={styles.iconContainer}
+          >
+            {isListening ? (
+              <View style={styles.dotsContainer}>
+                <View style={styles.dot} />
+                <View style={styles.dot} />
+                <View style={styles.dot} />
+              </View>
+            ) : (
+              <Icon name='microphone' size={24} color='#333' />
+            )}
+          </TouchableOpacity>
+        </View>
+      </View>
 
-      <TouchableOpacity
-       onPress = {() => {
-        isListening ? stopListening() : startListening()
-       }}
-       style={styles.iconContainer}
-      >
-        {isListening ? (
-          <View style = {styles.dotsContainer}>
-            <View style={styles.dot}/>
-            <View style={styles.dot}/>
-            <View style={styles.dot}/>
-          </View>
-        ):(
-          <Icon name='microphone' size={24} color='#333'/>
-        )}
-      </TouchableOpacity>
-      
+      {/* Bottom: Text to Speech */}
+      <View style={styles.half}>
+        <Text style={styles.sectionTitle}>📢 Text to Speech</Text>
+        <View style={styles.container}>
+          <TextInput
+            placeholder='Type to speak...'
+            value={ttsText}
+            onChangeText={setTtsText}
+            style={styles.input}
+            placeholderTextColor='#999'
+          />
+          <TouchableOpacity onPress={speakText} style={styles.iconContainer}>
+            <Icon name='volume-high' size={24} color='#333' />
+          </TouchableOpacity>
+        </View>
+      </View>
     </View>
-  )
-}
+  );
+};
 
-export default App
+const styles = StyleSheet.create({
+  page: {
+    flex: 1,
+    backgroundColor: '#fff',
+    paddingTop: 30,
+  },
+  half: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  sectionTitle: {
+    marginLeft: 20,
+    marginBottom: 10,
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#555',
+  },
+  container: {
+    flexDirection: 'row',
+    backgroundColor: '#f1f1f1',
+    borderRadius: 30,
+    alignItems: 'center',
+    paddingHorizontal: 15,
+    marginHorizontal: 20,
+    elevation: 3,
+  },
+  input: {
+    flex: 1,
+    height: 45,
+    fontSize: 16,
+    color: '#000',
+  },
+  iconContainer: {
+    marginLeft: 10,
+  },
+  dotsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  dot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#333',
+    marginHorizontal: 2,
+  },
+});
+
+export default App;
