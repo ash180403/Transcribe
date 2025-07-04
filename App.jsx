@@ -18,38 +18,43 @@ const App = () => {
   const [ttsText, setTtsText] = useState('');
 
   useEffect(() => {
-    // console.log('Tts:', Tts);
+    Voice.onSpeechStart = () => console.log('🎤 Recording started');
+    Voice.onSpeechEnd = () => {
+      console.log(' Recording ended');
+      setIsListening(false);
+    };
+    Voice.onSpeechResults = (event) => {
+      console.log(' Final Result:', event.value);
+      if (event.value?.[0]) setSearchText(event.value[0]);
+    };
+    Voice.onSpeechPartialResults = (event) => {
+      console.log(' Partial Result:', event.value);
+      if (event.value?.[0]) setSearchText(event.value[0]);
+    };
+    Voice.onSpeechError = (error) => {
+      console.log(' Speech Error:', error);
+      setIsListening(false);
+    };
 
-    Voice.onSpeechStart = () => console.log('Recording started');
-    Voice.onSpeechEnd = () => setIsListening(false);
-    Voice.onSpeechResults = event => setSearchText(event.value[0]);
-    Voice.onSpeechError = error => console.log('onSpeechError', error);
-
-    const androidPermissionChecking = async () => {
+    const requestPermissions = async () => {
       if (Platform.OS === 'android') {
         const granted = await PermissionsAndroid.request(
           PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
           {
             title: 'Microphone Permission',
-            message: 'This app needs access to your microphone',
+            message: 'This app needs access to your microphone for speech recognition',
             buttonNeutral: 'Ask Me Later',
             buttonNegative: 'Cancel',
             buttonPositive: 'OK',
           }
         );
-
-        if (granted === PermissionsAndroid.RESULTS.GRANTED) {
-          console.log('Microphone permission granted');
-        } else {
-          console.log('Microphone permission denied');
-        }
-
-        const getService = await Voice.getSpeechRecognitionServices();
-        console.log('Speech Services:', getService);
+        console.log('Mic permission:', granted);
+        const services = await Voice.getSpeechRecognitionServices();
+        console.log('Speech Services:', services);
       }
     };
 
-    androidPermissionChecking();
+    requestPermissions();
 
     return () => {
       Voice.destroy().then(Voice.removeAllListeners);
@@ -58,7 +63,9 @@ const App = () => {
 
   const startListening = async () => {
     try {
-      await Voice.start('en-US');
+      await Voice.start('en-US', {
+        EXTRA_PARTIAL_RESULTS: true, 
+      });
       setIsListening(true);
     } catch (error) {
       console.log('Start Listening Error', error);
@@ -85,11 +92,11 @@ const App = () => {
         <Text style={styles.sectionTitle}>🎙 Speech to Text</Text>
         <View style={styles.container}>
           <TextInput
-            placeholder='Say something...'
+            placeholder="Say something..."
             value={searchText}
             onChangeText={setSearchText}
             style={styles.input}
-            placeholderTextColor='#999'
+            placeholderTextColor="#999"
           />
           <TouchableOpacity
             onPress={() => (isListening ? stopListening() : startListening())}
@@ -102,7 +109,7 @@ const App = () => {
                 <View style={styles.dot} />
               </View>
             ) : (
-              <Icon name='microphone' size={24} color='#333' />
+              <Icon name="microphone" size={24} color="#333" />
             )}
           </TouchableOpacity>
         </View>
@@ -113,14 +120,14 @@ const App = () => {
         <Text style={styles.sectionTitle}>📢 Text to Speech</Text>
         <View style={styles.container}>
           <TextInput
-            placeholder='Type to speak...'
+            placeholder="Type to speak..."
             value={ttsText}
             onChangeText={setTtsText}
             style={styles.input}
-            placeholderTextColor='#999'
+            placeholderTextColor="#999"
           />
           <TouchableOpacity onPress={speakText} style={styles.iconContainer}>
-            <Icon name='volume-high' size={24} color='#333' />
+            <Icon name="volume-high" size={24} color="#333" />
           </TouchableOpacity>
         </View>
       </View>
