@@ -1,56 +1,48 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
   View,
-  TextInput,
+  Text,
   TouchableOpacity,
   StyleSheet,
   PermissionsAndroid,
-  Text,
+  ImageBackground,
+  ScrollView,
   Platform,
 } from 'react-native';
-import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import Voice from '@react-native-voice/voice';
 import Tts from 'react-native-tts';
 
+const backgroundImage = require('./assets/bg.jpg'); 
+
 const App = () => {
   const [isListening, setIsListening] = useState(false);
-  const [searchText, setSearchText] = useState('');
-  const [ttsText, setTtsText] = useState('');
+  const [isTalking, setIsTalking] = useState(false);
+  const [conversationHistory, setConversationHistory] = useState([]);
+  const scrollRef = useRef(null);
 
   useEffect(() => {
-    Voice.onSpeechStart = () => console.log('🎤 Recording started');
-    Voice.onSpeechEnd = () => {
-      console.log(' Recording ended');
-      setIsListening(false);
+    Voice.onSpeechStart = () => setIsListening(true);
+
+    Voice.onSpeechEnd = () => setIsListening(false);
+
+    Voice.onSpeechResults = async (event) => {
+      const userSpeech = event.value?.[0];
+      if (userSpeech) {
+        const updatedHistory = [...conversationHistory, { role: 'app', content: userSpeech }];
+        setConversationHistory(updatedHistory);
+        handleCloudResponse(updatedHistory);
+      }
     };
-    Voice.onSpeechResults = (event) => {
-      console.log(' Final Result:', event.value);
-      if (event.value?.[0]) setSearchText(event.value[0]);
-    };
-    Voice.onSpeechPartialResults = (event) => {
-      console.log(' Partial Result:', event.value);
-      if (event.value?.[0]) setSearchText(event.value[0]);
-    };
+
     Voice.onSpeechError = (error) => {
-      console.log(' Speech Error:', error);
+      console.log('Speech Error:', error);
       setIsListening(false);
+      setIsTalking(false);
     };
 
     const requestPermissions = async () => {
       if (Platform.OS === 'android') {
-        const granted = await PermissionsAndroid.request(
-          PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
-          {
-            title: 'Microphone Permission',
-            message: 'This app needs access to your microphone for speech recognition',
-            buttonNeutral: 'Ask Me Later',
-            buttonNegative: 'Cancel',
-            buttonPositive: 'OK',
-          }
-        );
-        console.log('Mic permission:', granted);
-        const services = await Voice.getSpeechRecognitionServices();
-        console.log('Speech Services:', services);
+        await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.RECORD_AUDIO);
       }
     };
 
@@ -59,131 +51,198 @@ const App = () => {
     return () => {
       Voice.destroy().then(Voice.removeAllListeners);
     };
-  }, []);
+  }, [conversationHistory]);
 
-  const startListening = async () => {
+  const startConversation = async () => {
     try {
-      await Voice.start('en-US', {
-        EXTRA_PARTIAL_RESULTS: true, 
-      });
-      setIsListening(true);
+      setIsTalking(true);
+      await Voice.start('en-US', { EXTRA_PARTIAL_RESULTS: false });
     } catch (error) {
       console.log('Start Listening Error', error);
+      setIsTalking(false);
     }
   };
 
-  const stopListening = async () => {
-    try {
-      await Voice.stop();
-      setIsListening(false);
-    } catch (error) {
-      console.log('Stop Listening Error', error);
+  const handleCloudResponse = async (history) => {
+    const response = await simulateCloudResponse(history); // Replace with your API 
+    const updatedHistory = [...history, response];
+    setConversationHistory(updatedHistory);
+
+    Tts.speak(response.content);
+
+    if (response.disconnect) {
+      setTimeout(() => setIsTalking(false), 1000);
+    } else {
+      setIsTalking(false);
     }
   };
 
-  const speakText = () => {
-    Tts.speak(ttsText);
+  const simulateCloudResponse = async (history) => {
+    const lastUserInput = history.filter(h => h.role === 'app').map(h => h.content).join(' ');
+
+    if (lastUserInput.toLowerCase().includes('buying a drone')) {
+      return {
+        role: 'cloud',
+        content: 'Oh so you are looking for recommendations for a drone. Shall I recommend some popular brands?',
+      };
+    }
+    if (lastUserInput.toLowerCase().includes('less than $500')) {
+      return {
+        role: 'cloud',
+        content: 'Sure, I would recommend a DJI Mini or Phantom Spark which are popular and within your budget. Do you want me to recommend more?',
+      };
+    }
+    if (lastUserInput.toLowerCase().includes('thank you')) {
+      return {
+        role: 'cloud',
+        content: 'Happy to help, cheers!',
+        disconnect: 1,
+      };
+    }
+
+    return {
+      role: 'cloud',
+      content: "I'm not sure I understood that. Can you repeat?",
+    };
   };
+
+  const resetConversation = () => {
+    setConversationHistory([]);
+    setIsListening(false);
+    setIsTalking(false);
+  };
+
+  const renderChatLog = () => (
+    <ScrollView
+      ref={scrollRef}
+      onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: true })}
+      style={styles.chatLog}
+      contentContainerStyle={{ paddingBottom: 40 }}
+    >
+      {conversationHistory.map((entry, index) => (
+        <View
+          key={index}
+          style={[
+            styles.chatBubble,
+            entry.role === 'app' ? styles.userBubble : styles.cloudBubble,
+          ]}
+        >
+          <Text style={styles.chatText}>{entry.content}</Text>
+        </View>
+      ))}
+    </ScrollView>
+  );
+
+  const renderWaveform = () => (
+    <View style={styles.waveform}>
+      <View style={styles.dot} />
+      <View style={styles.dot} />
+      <View style={styles.dot} />
+    </View>
+  );
 
   return (
-    <View style={styles.page}>
-      {/* Top: Speech to Text */}
-      <View style={styles.half}>
-        <Text style={styles.sectionTitle}>🎙 Speech to Text</Text>
-        <View style={styles.container}>
-          <TextInput
-            placeholder="Say something..."
-            value={searchText}
-            onChangeText={setSearchText}
-            style={styles.input}
-            placeholderTextColor="#999"
-          />
-          <TouchableOpacity
-            onPress={() => (isListening ? stopListening() : startListening())}
-            style={styles.iconContainer}
-          >
-            {isListening ? (
-              <View style={styles.dotsContainer}>
-                <View style={styles.dot} />
-                <View style={styles.dot} />
-                <View style={styles.dot} />
-              </View>
-            ) : (
-              <Icon name="microphone" size={24} color="#333" />
-            )}
-          </TouchableOpacity>
-        </View>
-      </View>
+    <ImageBackground source={backgroundImage} style={styles.background}>
+      <View style={styles.overlay}>
+        <TouchableOpacity style={styles.refreshBtn} onPress={resetConversation}>
+          <Text style={styles.refreshText}>↻</Text>
+        </TouchableOpacity>
 
-      {/* Bottom: Text to Speech */}
-      <View style={styles.half}>
-        <Text style={styles.sectionTitle}>📢 Text to Speech</Text>
-        <View style={styles.container}>
-          <TextInput
-            placeholder="Type to speak..."
-            value={ttsText}
-            onChangeText={setTtsText}
-            style={styles.input}
-            placeholderTextColor="#999"
-          />
-          <TouchableOpacity onPress={speakText} style={styles.iconContainer}>
-            <Icon name="volume-high" size={24} color="#333" />
-          </TouchableOpacity>
-        </View>
+        <TouchableOpacity
+          style={[styles.tryMeButton, isTalking && styles.buttonDisabled]}
+          onPress={startConversation}
+          disabled={isTalking}
+        >
+          {isListening ? renderWaveform() : (
+            <Text style={styles.buttonText}>{isTalking ? 'Listening...' : ' Try Me'}</Text>
+          )}
+        </TouchableOpacity>
+
+        {renderChatLog()}
       </View>
-    </View>
+    </ImageBackground>
   );
 };
 
 const styles = StyleSheet.create({
-  page: {
+  background: {
     flex: 1,
+    resizeMode: 'cover',
+  },
+  overlay: {
+    flex: 1,
+    justifyContent: 'flex-start',
+    alignItems: 'center',
+    paddingTop: 80,
+    paddingHorizontal: 20,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+  },
+  tryMeButton: {
     backgroundColor: '#fff',
-    paddingTop: 30,
+    paddingVertical: 15,
+    paddingHorizontal: 40,
+    borderRadius: 50,
+    elevation: 5,
+    marginBottom: 30,
   },
-  half: {
-    flex: 1,
-    justifyContent: 'center',
+  buttonDisabled: {
+    backgroundColor: '#aaa',
   },
-  sectionTitle: {
-    marginLeft: 20,
-    marginBottom: 10,
+  buttonText: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#555',
+    color: '#333',
   },
-  container: {
-    flexDirection: 'row',
-    backgroundColor: '#f1f1f1',
-    borderRadius: 30,
-    alignItems: 'center',
-    paddingHorizontal: 15,
-    marginHorizontal: 20,
-    elevation: 3,
-  },
-  input: {
+  chatLog: {
     flex: 1,
-    height: 45,
+    width: '100%',
+  },
+  chatBubble: {
+    maxWidth: '80%',
+    padding: 12,
+    marginVertical: 6,
+    borderRadius: 20,
+  },
+  userBubble: {
+    backgroundColor: '#d1e7dd',
+    alignSelf: 'flex-end',
+    borderTopRightRadius: 0,
+  },
+  cloudBubble: {
+    backgroundColor: '#f8d7da',
+    alignSelf: 'flex-start',
+    borderTopLeftRadius: 0,
+  },
+  chatText: {
     fontSize: 16,
-    color: '#000',
+    color: '#333',
   },
-  iconContainer: {
-    marginLeft: 10,
-  },
-  dotsContainer: {
+  waveform: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
   },
   dot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
     backgroundColor: '#333',
-    marginHorizontal: 2,
+    marginHorizontal: 4,
+  },
+  refreshBtn: {
+    position: 'absolute',
+    top: 40,
+    right: 20,
+    zIndex: 10,
+    backgroundColor: '#fff',
+    padding: 10,
+    borderRadius: 25,
+    elevation: 3,
+  },
+  refreshText: {
+    fontSize: 18,
+    fontWeight: 'bold',
   },
 });
 
 export default App;
-
-
